@@ -1,0 +1,127 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#f7f4fa">
+<title>=LOVE 回収管理</title>
+<style>
+:root{--bg:#f7f4fa;--card:#fff;--ink:#292536;--muted:#777181;--pink:#d64e91;--line:#e8e2ee;--green:#eaf8ef}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font-family:-apple-system,BlinkMacSystemFont,"Hiragino Sans","Yu Gothic",sans-serif}
+main{max-width:760px;margin:auto;padding:18px 14px calc(30px + env(safe-area-inset-bottom))}
+.hero{padding:22px 18px;background:linear-gradient(135deg,#f9dbea,#e8e4ff);border-radius:22px;margin-bottom:14px}
+h1{font-size:27px;margin:0 0 7px}.muted{color:var(--muted);font-size:13px;line-height:1.6}
+.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:12px 0}
+.card{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:13px}
+.statlabel{font-size:12px;color:var(--muted)}.num{font-size:25px;font-weight:800;margin-top:4px}
+.progressbox{margin-bottom:14px}.proghead{display:flex;justify-content:space-between;align-items:center;gap:8px}.track{height:8px;background:var(--line);border-radius:9px;overflow:hidden;margin-top:10px}.bar{height:100%;background:var(--pink);width:0}
+.tabs{display:grid;grid-template-columns:repeat(3,1fr);gap:7px;margin:14px 0}
+button,input{font:inherit}button{border:1px solid var(--line);border-radius:12px;background:var(--card);color:var(--ink);padding:11px 12px;cursor:pointer;min-height:44px}
+button:focus-visible,input:focus-visible{outline:3px solid #edacd0;outline-offset:2px}
+button.active{background:var(--ink);color:white;border-color:var(--ink)}button.primary{background:var(--pink);border-color:var(--pink);color:#fff;font-weight:700}
+input[type=text],input[type=search]{width:100%;min-width:0;padding:12px;border:1px solid var(--line);border-radius:12px;background:var(--card);color:var(--ink);font-size:16px}
+.addrow{display:flex;gap:8px;margin-top:9px}.addrow input{flex:1}
+.toolbar{display:flex;gap:8px;margin:12px 0;align-items:center}.toolbar input{flex:1}
+.songlist{display:grid;gap:8px;margin-top:9px}.song{display:flex;align-items:center;gap:10px;padding:12px;border:1px solid var(--line);border-radius:13px;background:var(--card)}
+.song.done{background:var(--green);border-color:#c8e8d3}.song input{width:22px;height:22px;accent-color:var(--pink);flex-shrink:0}.songname{flex:1;overflow-wrap:anywhere}.song.done .songname{text-decoration:line-through;color:#557363}
+.del{padding:5px 9px;min-height:34px;color:#a73558;font-size:13px}.empty{text-align:center;padding:28px 12px;color:var(--muted);background:var(--card);border:1px dashed var(--line);border-radius:14px}
+.sectiontitle{font-weight:750}.foot{margin-top:16px}.foot button{font-size:14px}.fileinput{display:none}.notice{font-size:12px;color:var(--muted);line-height:1.7;margin:12px 2px}
+@media(min-width:600px){main{padding-top:28px}.hero{padding:26px}.song{padding:13px 15px}}
+</style>
+</head>
+<body>
+<main>
+<section class="hero">
+<h1>♡ =LOVE 回収管理</h1>
+<div>ライブ現地で聴いた曲をチェックして管理しよう。</div>
+<p class="muted">曲名は自分で登録。回収済み・未回収をいつでも切り替え。</p>
+</section>
+<section class="stats">
+<div class="card"><div class="statlabel">登録曲数</div><div class="num" id="total">0</div></div>
+<div class="card"><div class="statlabel">回収済み</div><div class="num" id="done">0</div></div>
+<div class="card"><div class="statlabel">未回収</div><div class="num" id="todo">0</div></div>
+</section>
+<section class="card progressbox">
+<div class="proghead"><strong id="rate">回収率 0%</strong><span class="muted" id="saveState">このブラウザに保存</span></div>
+<div class="track"><div class="bar" id="bar"></div></div>
+</section>
+<section class="card">
+<div class="sectiontitle">曲を追加</div>
+<div class="addrow"><input id="newSong" type="text" maxlength="120" placeholder="曲名を入力" autocomplete="off"><button id="add" class="primary">追加</button></div>
+<p class="muted">追加した曲は一覧に表示されるよ。同じ曲名は重複登録できません。</p>
+</section>
+<div class="tabs" role="group" aria-label="表示する曲">
+<button class="active" data-filter="all">全曲一覧</button><button data-filter="done">回収済み</button><button data-filter="todo">未回収</button>
+</div>
+<div class="toolbar"><input id="search" type="search" placeholder="登録した曲を検索"><span class="muted" id="shown">0曲</span></div>
+<div id="list" class="songlist"></div>
+<section class="card foot">
+<div class="sectiontitle">バックアップ</div>
+<p class="muted">端末変更やブラウザデータ消去に備えて、定期的に書き出してね。</p>
+<div class="toolbar"><button id="export">書き出す</button><button id="importBtn">読み込む</button><input class="fileinput" id="importFile" type="file" accept="application/json"></div>
+<button id="clear" style="color:#a73558">全曲のチェックを解除</button>
+</section>
+<p class="notice">保存について：登録曲とチェック状態は、このWebサイトを開いたブラウザ内に保存されます。同じURLをSafariで開いて使ってください。プライベートブラウズやサイトデータ消去、別端末では引き継がれない場合があります。バックアップを保管してね。</p>
+</main>
+<script>
+(function(){
+'use strict';
+const KEY='equalove-recovery-v2';
+let songs=[];
+let filter='all';
+const $=id=>document.getElementById(id);
+try{
+ const saved=JSON.parse(localStorage.getItem(KEY)||'null');
+ if(saved&&Array.isArray(saved.songs)) songs=saved.songs.filter(s=>s&&typeof s.name==='string').map(s=>({name:s.name,done:!!s.done}));
+}catch(e){}
+function persist(){
+ try{localStorage.setItem(KEY,JSON.stringify({songs}));$('saveState').textContent='保存済み ✓';}
+ catch(e){$('saveState').textContent='保存できません（バックアップ推奨）';}
+}
+function render(){
+ const done=songs.filter(s=>s.done).length, total=songs.length, todo=total-done, pct=total?Math.round(done/total*100):0;
+ $('total').textContent=total;$('done').textContent=done;$('todo').textContent=todo;$('rate').textContent='回収率 '+pct+'%';$('bar').style.width=pct+'%';
+ const q=$('search').value.trim().toLocaleLowerCase();
+ const filtered=songs.map((s,i)=>({...s,i})).filter(s=>(filter==='all'||(filter==='done'&&s.done)||(filter==='todo'&&!s.done))&&s.name.toLocaleLowerCase().includes(q));
+ $('shown').textContent=filtered.length+'曲';$('list').replaceChildren();
+ document.querySelectorAll('[data-filter]').forEach(b=>b.classList.toggle('active',b.dataset.filter===filter));
+ if(!filtered.length){const empty=document.createElement('div');empty.className='empty';empty.textContent=songs.length?'該当する曲がないよ。':'まだ曲が登録されていません。上の欄から曲名を追加してね。';$('list').append(empty);return;}
+ filtered.forEach(s=>{
+  const row=document.createElement('div');row.className='song'+(s.done?' done':'');
+  const cb=document.createElement('input');cb.type='checkbox';cb.checked=s.done;cb.setAttribute('aria-label',s.name+' 回収済み');
+  cb.addEventListener('change',()=>{songs[s.i].done=cb.checked;persist();render();});
+  const name=document.createElement('span');name.className='songname';name.textContent=s.name;
+  const del=document.createElement('button');del.className='del';del.textContent='削除';del.setAttribute('aria-label',s.name+'を削除');
+  del.addEventListener('click',()=>{if(confirm('「'+s.name+'」を一覧から削除する？')){songs.splice(s.i,1);persist();render();}});
+  row.append(cb,name,del);$('list').append(row);
+ });
+}
+function add(){
+ const name=$('newSong').value.trim();
+ if(!name)return;
+ if(songs.some(s=>s.name.toLocaleLowerCase()===name.toLocaleLowerCase())){alert('同じ曲名がすでに登録されています。');return;}
+ songs.push({name,done:false});$('newSong').value='';persist();render();$('newSong').focus();
+}
+$('add').addEventListener('click',add);
+$('newSong').addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();add();}});
+$('search').addEventListener('input',render);
+document.querySelectorAll('[data-filter]').forEach(b=>b.addEventListener('click',()=>{filter=b.dataset.filter;render();}));
+$('export').addEventListener('click',()=>{
+ const blob=new Blob([JSON.stringify({version:1,songs},null,2)],{type:'application/json'});
+ const url=URL.createObjectURL(blob);const a=document.createElement('a');a.href=url;a.download='equalove-recovery-backup.json';document.body.append(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),1000);
+});
+$('importBtn').addEventListener('click',()=>$('importFile').click());
+$('importFile').addEventListener('change',async e=>{
+ const file=e.target.files&&e.target.files[0];if(!file)return;
+ try{const data=JSON.parse(await file.text());if(!data||!Array.isArray(data.songs))throw new Error('format');
+  if(!confirm('現在の曲リストを、バックアップの内容で置き換える？'))return;
+  songs=data.songs.filter(s=>s&&typeof s.name==='string').map(s=>({name:s.name.trim(),done:!!s.done})).filter(s=>s.name);
+  persist();render();alert('バックアップを読み込みました。');
+ }catch(err){alert('バックアップを読み込めませんでした。ファイルを確認してね。');}
+ finally{e.target.value='';}
+});
+$('clear').addEventListener('click',()=>{if(confirm('登録曲は残して、すべての回収チェックを解除する？')){songs=songs.map(s=>({...s,done:false}));persist();render();}});
+render();
+})();
+</script>
+</body></html>
